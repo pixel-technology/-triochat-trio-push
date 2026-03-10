@@ -5,7 +5,6 @@ export type { TrioChatNotificationClientConfig } from "./client";
 export type { Device } from "./client";
 export type { RegisterDeviceResponse } from "./client";
 export type { SendNotificationResponse } from "./client";
-export type { GetDevicesResponse } from "./client";
 
 // Clean input types (rename DTO → cleaner names)
 export type { RegisterDeviceDto as RegisterDeviceInput } from "./client";
