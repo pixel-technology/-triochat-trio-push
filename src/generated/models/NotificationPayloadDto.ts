@@ -5,5 +5,6 @@
 export type NotificationPayloadDto = {
     title: string;
     body: string;
+    imageUrl?: string;
 };
 

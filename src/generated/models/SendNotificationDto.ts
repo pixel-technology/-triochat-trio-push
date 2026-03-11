@@ -7,5 +7,9 @@ export type SendNotificationDto = {
     device_ids?: Array<string>;
     notification: NotificationPayloadDto;
     data?: Record<string, any>;
+    android?: Record<string, any>;
+    webpush?: Record<string, any>;
+    apns?: Record<string, any>;
+    fcmOptions?: Record<string, any>;
 };
 

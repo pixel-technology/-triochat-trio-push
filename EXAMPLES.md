@@ -1,293 +1,598 @@
-# Examples
+# TrioChat Push SDK - Complete Examples
+
+## Table of Contents
+- [Setup](#setup)
+- [Basic Usage](#basic-usage)
+- [Platform-Specific Notifications](#platform-specific-notifications)
+- [Advanced Examples](#advanced-examples)
+
+## Setup
+
+### Production Environment
+```typescript
+import { TrioChatNotificationClient } from '@triochat/trio-push';
+
+const client = new TrioChatNotificationClient({
+  token: process.env.TRIO_PUSH_TOKEN!
+});
+```
+
+### Development Environment
+```typescript
+const devClient = new TrioChatNotificationClient({
+  token: process.env.TRIO_PUSH_TOKEN_DEV!,
+  is_dev: true  // Uses dev API endpoint
+});
+```
 
 ## Basic Usage
 
+### 1. Register a Device
 ```typescript
-import { TrioChatNotificationClient } from '@triochat/trio-push';
+import { TrioPushPlatform } from '@triochat/trio-push';
 
-// Initialize the client
-const client = new TrioChatNotificationClient({
-  token: 'your-jwt-token',
-  baseUrl: 'https://api.triochat.com',
+const result = await client.registerDevice({
+  fcm_token: 'firebase-token-from-device',
+  platform: TrioPushPlatform.IOS,
+  metadata: {
+    user_id: 'user-123',
+    app_version: '2.0.0',
+    device_model: 'iPhone 14'
+  }
 });
 
-// Example 1: Register a device
-async function example1() {
-  const response = await client.registerDevice({
-    fcm_token: 'device-fcm-token-from-firebase',
-    platform: 'ios',
-    metadata: {
-      app_version: '1.0.0',
-      device_model: 'iPhone 14',
-    }
-  });
-  console.log('Device registered:', response);
-}
+console.log('Device registered:', result.device_id);
+```
 
-// Example 2: Get all devices
-async function example2() {
-  const response = await client.getDevices();
-  console.log(`Total devices: ${response.total}`);
-  response.devices.forEach(device => {
-    console.log(`- ${device.platform} device: ${device.id}`);
-  });
-}
+### 2. Get All Devices
+```typescript
+const devices = await client.getDevices();
 
-// Example 3: Send notification to specific devices
-async function example3() {
-  const response = await client.sendNotification({
-    device_ids: ['device-id-1', 'device-id-2'],
+// Filter by platform
+const iosDevices = devices.filter(d => d.platform === TrioPushPlatform.IOS);
+const androidDevices = devices.filter(d => d.platform === TrioPushPlatform.ANDROID);
+
+// Find device by user
+const userDevice = devices.find(d => d.metadata?.user_id === 'user-123');
+```
+
+### 3. Send Basic Notification
+```typescript
+await client.sendNotification({
+  device_ids: ['device-123', 'device-456'],
+  notification: {
+    title: 'New Message',
+    body: 'You have a new message from John'
+  }
+});
+```
+
+## Platform-Specific Notifications
+
+### Android Notification with Full Configuration
+
+```typescript
+await client.sendNotification({
+  device_ids: ['android-device-1'],
+  notification: {
+    title: 'New Message',
+    body: 'You have a new message'
+  },
+  android: {
+    // Message priority
+    priority: 'high',
+    
+    // Time to live (in milliseconds)
+    ttl: 86400000, // 24 hours
+    
+    // Collapse key for message grouping
+    collapseKey: 'chat_messages',
+    
+    // Android-specific notification options
     notification: {
-      title: 'New Message',
-      body: 'You have a new message from John'
+      channelId: 'chat_messages',
+      sound: 'default',
+      color: '#FF5722',
+      icon: 'ic_notification',
+      tag: 'chat_tag',
+      
+      // Click action
+      clickAction: 'OPEN_CHAT_ACTIVITY',
+      
+      // Badge count
+      notificationCount: 5,
+      
+      // Vibration pattern (in milliseconds)
+      vibrateTimingsMillis: [0, 500, 200, 500],
+      
+      // LED settings
+      lightSettings: {
+        color: '#FF5722',
+        lightOnDurationMillis: 300,
+        lightOffDurationMillis: 1000
+      },
+      
+      // Sticky notification
+      sticky: true,
+      
+      // Priority
+      priority: 'high',
+      
+      // Visibility
+      visibility: 'public'
+    }
+  },
+  data: {
+    action: 'open_chat',
+    chat_id: '789',
+    message_id: '123'
+  }
+});
+```
+
+### iOS (APNs) Notification with Full Configuration
+
+```typescript
+await client.sendNotification({
+  device_ids: ['ios-device-1'],
+  notification: {
+    title: 'New Message',
+    body: 'You have a new message'
+  },
+  apns: {
+    // APNs headers
+    headers: {
+      'apns-priority': '10',
+      'apns-expiration': '0'
     },
-    data: {
-      action: 'open_chat',
-      chat_id: '123',
-      message_id: '456'
+    
+    // APNs payload
+    payload: {
+      aps: {
+        // Alert configuration
+        alert: {
+          title: 'New Message',
+          subtitle: 'From John',
+          body: 'Hey, check this out!',
+          
+          // Localization
+          titleLocKey: 'NOTIFICATION_TITLE',
+          titleLocArgs: ['John'],
+          locKey: 'NOTIFICATION_BODY',
+          locArgs: ['message'],
+          
+          // Launch image
+          launchImage: 'chat_icon'
+        },
+        
+        // Badge count
+        badge: 5,
+        
+        // Sound
+        sound: 'default',
+        // OR critical sound
+        // sound: {
+        //   critical: true,
+        //   name: 'critical_alert.caf',
+        //   volume: 1.0
+        // },
+        
+        // Content available for background updates
+        contentAvailable: true,
+        
+        // Mutable content (for notification extensions)
+        mutableContent: true,
+        
+        // Category for action buttons
+        category: 'MESSAGE_CATEGORY',
+        
+        // Thread ID for grouping
+        threadId: 'chat-789'
+      },
+      
+      // Custom data
+      chatId: '789',
+      messageId: '123'
+    },
+    
+    // FCM options for iOS
+    fcmOptions: {
+      analyticsLabel: 'ios_chat_notification',
+      imageUrl: 'https://example.com/image.jpg'
     }
-  });
-  console.log(`Success: ${response.success_count}, Failed: ${response.failure_count}`);
-}
+  },
+  data: {
+    action: 'open_chat',
+    chat_id: '789'
+  }
+});
+```
 
-// Example 4: Broadcast to all devices
-async function example4() {
-  await client.sendNotification({
+### Web Push Notification with Full Configuration
+
+```typescript
+await client.sendNotification({
+  device_ids: ['web-device-1'],
+  notification: {
+    title: 'New Update',
+    body: 'Check out the new features'
+  },
+  webpush: {
+    // Web push headers
+    headers: {
+      'TTL': '86400',
+      'Urgency': 'high'
+    },
+    
+    // Notification options
     notification: {
-      title: 'System Announcement',
-      body: 'New features available!'
-    }
-  });
-}
-```
-
-## With Error Handling
-
-```typescript
-import { TrioChatNotificationClient, TrioPushError } from '@triochat/trio-push';
-
-const client = new TrioChatNotificationClient({
-  token: process.env.TRIO_PUSH_TOKEN!,
-  maxRetries: 5,
-  retryDelay: 2000,
-});
-
-async function sendNotificationSafely(deviceIds: string[], title: string, body: string) {
-  try {
-    const response = await client.sendNotification({
-      device_ids: deviceIds,
-      notification: { title, body }
-    });
-    
-    if (response.success_count > 0) {
-      console.log(`✓ Notification sent to ${response.success_count} devices`);
-    }
-    
-    if (response.failure_count > 0) {
-      console.warn(`✗ Failed to send to ${response.failure_count} devices`);
-      response.results?.forEach(result => {
-        if (!result.success) {
-          console.error(`  Device ${result.device_id}: ${result.error}`);
+      title: 'New Update Available',
+      body: 'Click to explore new features',
+      icon: '/icons/notification-icon.png',
+      image: '/images/feature-preview.jpg',
+      badge: '/icons/badge.png',
+      
+      // Direction
+      dir: 'ltr',
+      
+      // Language
+      lang: 'en-US',
+      
+      // Tag for grouping
+      tag: 'update_notification',
+      
+      // Require user interaction
+      requireInteraction: true,
+      
+      // Renotify on update
+      renotify: true,
+      
+      // Vibration pattern
+      vibrate: [200, 100, 200],
+      
+      // Action buttons
+      actions: [
+        {
+          action: 'view',
+          title: 'View Now',
+          icon: '/icons/view.png'
+        },
+        {
+          action: 'dismiss',
+          title: 'Later',
+          icon: '/icons/dismiss.png'
         }
-      });
-    }
-    
-    return response;
-  } catch (error) {
-    if (error instanceof TrioPushError) {
-      console.error(`API Error [${error.statusCode}]: ${error.message}`);
-      if (error.response) {
-        console.error('Response:', error.response);
+      ],
+      
+      // Custom data
+      data: {
+        url: '/updates',
+        timestamp: Date.now()
       }
-    } else {
-      console.error('Unexpected error:', error);
+    },
+    
+    // FCM options for web
+    fcmOptions: {
+      link: 'https://app.example.com/updates'
     }
-    throw error;
   }
-}
+});
 ```
 
-## React Native Integration
+## Advanced Examples
+
+### Multi-Platform Notification
+
+Send a notification that works across all platforms with platform-specific customizations:
 
 ```typescript
-import { TrioChatNotificationClient } from '@triochat/trio-push';
-import messaging from '@react-native-firebase/messaging';
+await client.sendNotification({
+  device_ids: ['ios-1', 'android-1', 'web-1'],
+  
+  // Base notification (fallback)
+  notification: {
+    title: 'New Message',
+    body: 'You have a new message from John',
+    imageUrl: 'https://example.com/avatar.jpg'
+  },
+  
+  // Custom data payload
+  data: {
+    action: 'open_chat',
+    chat_id: '789',
+    message_id: '123',
+    sender_id: 'john-456'
+  },
+  
+  // Android customization
+  android: {
+    priority: 'high',
+    notification: {
+      channelId: 'chat_messages',
+      sound: 'message_tone',
+      color: '#2196F3',
+      clickAction: 'OPEN_CHAT',
+      tag: 'chat_789'
+    }
+  },
+  
+  // iOS customization
+  apns: {
+    payload: {
+      aps: {
+        alert: {
+          title: 'New Message',
+          subtitle: 'From John',
+          body: 'Hey, check this out!'
+        },
+        badge: 1,
+        sound: 'message.caf',
+        threadId: 'chat-789'
+      }
+    }
+  },
+  
+  // Web customization
+  webpush: {
+    notification: {
+      icon: '/icons/message.png',
+      badge: '/icons/badge.png',
+      requireInteraction: true
+    },
+    fcmOptions: {
+      link: 'https://app.example.com/chat/789'
+    }
+  },
+  
+  // Analytics label
+  fcmOptions: {
+    analyticsLabel: 'chat_message_notification'
+  }
+});
+```
 
-const client = new TrioChatNotificationClient({
-  token: 'your-jwt-token',
+### Broadcast to All Devices
+
+```typescript
+// Omit device_ids to send to all devices in workspace
+await client.sendNotification({
+  notification: {
+    title: '📢 System Announcement',
+    body: 'Scheduled maintenance tonight at 2 AM'
+  },
+  android: { priority: 'normal' },
+  apns: {
+    payload: {
+      aps: {
+        sound: 'default',
+        badge: 0
+      }
+    }
+  }
+});
+```
+
+### Silent Data Notification (Background Update)
+
+```typescript
+// iOS
+await client.sendNotification({
+  device_ids: ['ios-device-1'],
+  notification: {
+    title: '',
+    body: ''
+  },
+  apns: {
+    payload: {
+      aps: {
+        contentAvailable: true,
+        badge: 0
+      },
+      // Custom data
+      updateType: 'sync',
+      lastSync: Date.now()
+    }
+  },
+  data: {
+    silent: 'true',
+    action: 'background_sync'
+  }
 });
 
-// Register device when user logs in
-async function registerDevice() {
-  // Request permission
-  const authStatus = await messaging().requestPermission();
-  const enabled =
-    authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-    authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-
-  if (!enabled) {
-    console.log('Push notification permission denied');
-    return;
-  }
-
-  // Get FCM token
-  const fcmToken = await messaging().getToken();
-  
-  // Register with Trio Push
-  await client.registerDevice({
-    fcm_token: fcmToken,
-    platform: Platform.OS === 'ios' ? 'ios' : 'android',
-    metadata: {
-      app_version: DeviceInfo.getVersion(),
-      device_model: DeviceInfo.getModel(),
+// Android
+await client.sendNotification({
+  device_ids: ['android-device-1'],
+  notification: {
+    title: '',
+    body: ''
+  },
+  android: {
+    priority: 'normal',
+    data: {
+      type: 'background_sync',
+      timestamp: String(Date.now())
     }
+  }
+});
+```
+
+### Rich Notification with Image
+
+```typescript
+await client.sendNotification({
+  device_ids: ['device-1'],
+  notification: {
+    title: 'Photo from John',
+    body: 'Check out my vacation photos!',
+    imageUrl: 'https://example.com/photos/vacation.jpg'
+  },
+  android: {
+    notification: {
+      imageUrl: 'https://example.com/photos/vacation.jpg',
+      clickAction: 'OPEN_PHOTO'
+    }
+  },
+  apns: {
+    fcmOptions: {
+      imageUrl: 'https://example.com/photos/vacation.jpg'
+    },
+    payload: {
+      aps: {
+        mutableContent: true,
+        category: 'PHOTO_CATEGORY'
+      }
+    }
+  }
+});
+```
+
+### Localized Notification
+
+```typescript
+await client.sendNotification({
+  device_ids: ['device-1'],
+  notification: {
+    title: 'New Message',
+    body: 'You have %d new messages'
+  },
+  android: {
+    notification: {
+      titleLocKey: 'notification_title_new_message',
+      bodyLocKey: 'notification_body_message_count',
+      bodyLocArgs: ['5']
+    }
+  },
+  apns: {
+    payload: {
+      aps: {
+        alert: {
+          titleLocKey: 'NOTIFICATION_TITLE',
+          locKey: 'MESSAGE_COUNT',
+          locArgs: ['5']
+        }
+      }
+    }
+  }
+});
+```
+
+### Critical Alert (iOS)
+
+```typescript
+await client.sendNotification({
+  device_ids: ['ios-device-1'],
+  notification: {
+    title: '🚨 Emergency Alert',
+    body: 'Immediate action required'
+  },
+  apns: {
+    headers: {
+      'apns-priority': '10'
+    },
+    payload: {
+      aps: {
+        alert: {
+          title: '🚨 Emergency Alert',
+          body: 'Immediate action required'
+        },
+        sound: {
+          critical: true,
+          name: 'emergency.caf',
+          volume: 1.0
+        },
+        badge: 1
+      }
+    }
+  }
+});
+```
+
+## Error Handling
+
+```typescript
+import { TrioPushError } from '@triochat/trio-push';
+
+try {
+  const result = await client.sendNotification({
+    device_ids: ['device-123'],
+    notification: { title: 'Test', body: 'Test message' }
   });
   
-  console.log('Device registered successfully');
-}
-
-// Handle token refresh
-messaging().onTokenRefresh(async (token) => {
-  await client.registerDevice({
-    fcm_token: token,
-    platform: Platform.OS === 'ios' ? 'ios' : 'android',
-  });
-});
-```
-
-## Express.js Backend Integration
-
-```typescript
-import express from 'express';
-import { TrioChatNotificationClient } from '@triochat/trio-push';
-
-const app = express();
-app.use(express.json());
-
-const notificationClient = new TrioChatNotificationClient({
-  token: process.env.TRIO_PUSH_TOKEN!,
-});
-
-// Endpoint to register user's device
-app.post('/api/devices/register', async (req, res) => {
-  try {
-    const { fcm_token, platform, metadata } = req.body;
-    
-    const response = await notificationClient.registerDevice({
-      fcm_token,
-      platform,
-      metadata,
+  console.log(`✓ Sent to ${result.success_count} devices`);
+  
+  if (result.failure_count > 0) {
+    console.warn(`✗ Failed to send to ${result.failure_count} devices`);
+    result.results?.forEach(r => {
+      if (!r.success) {
+        console.error(`  Device ${r.device_id}: ${r.error}`);
+      }
     });
-    
-    res.json({ success: true, data: response });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
   }
-});
-
-// Endpoint to send notification
-app.post('/api/notifications/send', async (req, res) => {
-  try {
-    const { user_ids, title, body, data } = req.body;
-    
-    // Get devices for these users
-    const { devices } = await notificationClient.getDevices();
-    const targetDevices = devices
-      .filter(device => user_ids.includes(device.user_id))
-      .map(device => device.id);
-    
-    const response = await notificationClient.sendNotification({
-      device_ids: targetDevices,
-      notification: { title, body },
-      data,
+} catch (error) {
+  if (error instanceof TrioPushError) {
+    console.error('API Error:', {
+      message: error.message,
+      statusCode: error.statusCode,
+      response: error.response
     });
-    
-    res.json({ success: true, data: response });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.listen(3000, () => {
-  console.log('Server running on port 3000');
-});
-```
-
-## Next.js API Route
-
-```typescript
-// pages/api/notifications/send.ts
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { TrioChatNotificationClient } from '@triochat/trio-push';
-
-const client = new TrioChatNotificationClient({
-  token: process.env.TRIO_PUSH_TOKEN!,
-});
-
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  try {
-    const { device_ids, title, body, data } = req.body;
-
-    const response = await client.sendNotification({
-      device_ids,
-      notification: { title, body },
-      data,
-    });
-
-    res.status(200).json(response);
-  } catch (error) {
-    console.error('Failed to send notification:', error);
-    res.status(500).json({ error: 'Failed to send notification' });
+  } else {
+    console.error('Unexpected error:', error);
   }
 }
 ```
 
-## TypeScript Types
+## TypeScript Usage
 
 ```typescript
 import type {
-  TrioChatNotificationClientConfig,
-  RegisterDeviceDto,
-  SendNotificationDto,
-  NotificationPayloadDto,
-  Device,
-  GetDevicesResponse,
-  RegisterDeviceResponse,
-  SendNotificationResponse,
+  SendNotificationRequest,
+  AndroidConfig,
+  ApnsConfig,
+  WebpushConfig,
+  Device
 } from '@triochat/trio-push';
 
-// Type-safe configuration
-const config: TrioChatNotificationClientConfig = {
-  token: 'your-token',
-  timeout: 60000,
-  maxRetries: 5,
-};
+// Type-safe notification builder
+function buildChatNotification(
+  deviceIds: string[],
+  message: string,
+  chatId: string
+): SendNotificationRequest {
+  const androidConfig: AndroidConfig = {
+    priority: 'high',
+    notification: {
+      channelId: 'chat',
+      sound: 'default'
+    }
+  };
+  
+  const apnsConfig: ApnsConfig = {
+    payload: {
+      aps: {
+        sound: 'default',
+        badge: 1
+      }
+    }
+  };
+  
+  return {
+    device_ids: deviceIds,
+    notification: {
+      title: 'New Message',
+      body: message
+    },
+    data: { chat_id: chatId },
+    android: androidConfig,
+    apns: apnsConfig
+  };
+}
 
-// Type-safe device registration
-const deviceData: RegisterDeviceDto = {
-  fcm_token: 'token',
-  platform: 'ios',
-  metadata: {
-    custom_field: 'value',
-  },
-};
+// Use it
+const notification = buildChatNotification(
+  ['device-1', 'device-2'],
+  'Hello!',
+  '789'
+);
 
-// Type-safe notification
-const notification: SendNotificationDto = {
-  device_ids: ['id1', 'id2'],
-  notification: {
-    title: 'Title',
-    body: 'Body',
-  },
-  data: {
-    action: 'open',
-  },
-};
+await client.sendNotification(notification);
 ```

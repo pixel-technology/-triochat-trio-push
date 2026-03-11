@@ -24,6 +24,7 @@ Send push notifications, manage devices, and integrate with TrioChat — all wit
 - 📱 **Multi-platform** — iOS, Android, and Web support
 - ⚡ **Simple API** — register devices and fire notifications in minutes
 - 🌐 **Universal** — runs in React Native, Node.js, NestJS, Express, Bun, Deno, and browsers
+- 🔀 **Auto environment detection** — dev vs prod is resolved from the token itself, no extra config needed
 
 ---
 
@@ -67,6 +68,20 @@ new TrioChatNotificationClient(config: TrioChatNotificationClientConfig)
 | `token` | `string` |    ✅    | —       | API token generated from the [TrioChat Dashboard](https://app.triochat.io/) |
 
 > 🔑 **Get your token** — log in to [app.triochat.io](https://app.triochat.io/), navigate to your workspace settings, and generate an API token. Treat it like a password — never commit it to source control.
+
+> 🔀 **Environment is automatic** — the SDK decodes the `is_dev` claim from your JWT token and automatically routes requests to the correct endpoint. A development token hits `triochat-push-dev.onrender.com`; a production token hits `triochat-push.onrender.com`. You never need to pass an environment flag manually.
+
+```typescript
+// Production token  → https://triochat-push.onrender.com
+const client = new TrioChatNotificationClient({
+  token: process.env.TRIO_PUSH_TOKEN!,
+});
+
+// Development token → https://triochat-push-dev.onrender.com
+const devClient = new TrioChatNotificationClient({
+  token: process.env.TRIO_PUSH_TOKEN_DEV!,
+});
+```
 
 ---
 
@@ -248,6 +263,8 @@ await client.sendNotification({
 
 ```typescript
 // Rotate your token when it refreshes
+// Note: the base URL is fixed at construction time — swapping tokens
+// does not change which environment (dev/prod) is targeted.
 client.setToken("new-jwt-token");
 ```
 
@@ -297,6 +314,8 @@ client.setToken("new-jwt-token");
 ```typescript
 client.setToken("new-jwt-token");
 ```
+
+> ⚠️ The target environment (dev/prod) is locked at construction time based on the initial token's `is_dev` claim. Calling `setToken()` only updates the auth credential — it does not re-route requests to a different environment.
 
 ---
 
@@ -466,10 +485,11 @@ await client.registerDevice({
 ## ✅ Best Practices
 
 1. 🔑 **Keep backend tokens secret** — your token is generated from [app.triochat.io](https://app.triochat.io/) and should only ever live on your server via an env variable (e.g. `TRIO_PUSH_TOKEN`), never in client app bundles
-2. 📱 **Register on every app launch** — FCM tokens can rotate, so always call `registerDevice` when the app starts or the user logs in
-3. 🏷️ **Use metadata** — store `app_version`, `locale`, `device_model`, `user_id`, etc. to help with targeting and debugging
-4. 📦 **Batch your sends** — always pass multiple `device_ids` in one call rather than looping
-5. 🛡️ **Always handle errors** — wrap calls in `try/catch` and check `error instanceof TrioPushError`
+2. 🔀 **Use the right token per environment** — the SDK auto-detects dev vs prod from the `is_dev` claim inside the JWT, so just swap the token and the correct endpoint is used automatically
+3. 📱 **Register on every app launch** — FCM tokens can rotate, so always call `registerDevice` when the app starts or the user logs in
+4. 🏷️ **Use metadata** — store `app_version`, `locale`, `device_model`, `user_id`, etc. to help with targeting and debugging
+5. 📦 **Batch your sends** — always pass multiple `device_ids` in one call rather than looping
+6. 🛡️ **Always handle errors** — wrap calls in `try/catch` and check `error instanceof TrioPushError`
 
 ---
 
