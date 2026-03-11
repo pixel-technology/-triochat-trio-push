@@ -384,11 +384,10 @@ export class TrioChatNotificationClient {
       const payloadBase64 = token.split(".")[1];
       if (!payloadBase64) return false;
 
-      // Base64url → Base64 → JSON
-      const json = atob(payloadBase64.replace(/-/g, "+").replace(/_/g, "/"));
+      const json = Buffer.from(payloadBase64, "base64url").toString("utf8");
       const payload = JSON.parse(json);
 
-      return Boolean(payload[claim]);
+      return Boolean(payload?.[claim]);
     } catch {
       return false;
     }
